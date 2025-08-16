@@ -23,6 +23,5 @@ Calories: Total calories burned (the target variable).
 Evaluation Metric
 Submissions are evaluated on the Root Mean Squared Logarithmic Error (RMSLE). This metric is useful for regression tasks where the target has a wide range of values and penalizes underprediction more heavily than overprediction.
 
-For pulling data, use:
-competition_name = "playground-series-s5e5"
-kaggle.json file is located in repos folder which is a parent of a repo of this project.
+For data, look into data subfolder. Use subsample files except for generating final predictions for submission.
+
