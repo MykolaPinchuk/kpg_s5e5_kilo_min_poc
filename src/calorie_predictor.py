@@ -1,6 +1,8 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import OneHotEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import mean_squared_error
 from xgboost import XGBRegressor
 import warnings
 warnings.filterwarnings('ignore')
@@ -14,7 +16,7 @@ def load_and_preprocess_train_data(filepath):
     
     Returns:
     X (DataFrame): Preprocessed features
-    y (Series): Target variable
+    y (Series): Log-transformed target variable
     encoder (OneHotEncoder): Fitted encoder for Gender column
     """
     # Load data
@@ -23,6 +25,9 @@ def load_and_preprocess_train_data(filepath):
     # Separate features and target
     X = data.drop('Calories', axis=1)
     y = data['Calories']
+    
+    # Apply log(1 + y) transformation to target
+    y = np.log1p(y)
     
     # One-hot encode Gender column
     encoder = OneHotEncoder(drop='first', sparse_output=False)
@@ -101,12 +106,75 @@ def generate_predictions(model, X_test):
     X_test (DataFrame): Preprocessed test features
     
     Returns:
-    predictions (array): Model predictions
+    predictions (array): Model predictions converted back to original scale
     """
     # Generate predictions
     predictions = model.predict(X_test)
     
+    # Apply exp(predictions) - 1 transformation to convert back to original scale
+    predictions = np.expm1(predictions)
+    
+    # Clip predictions to [0, max_calorie] range
+    max_calorie = 10000  # Set a reasonable upper limit for calories
+    predictions = np.clip(predictions, 0, max_calorie)
+    
     return predictions
+
+def calculate_rmsle(y_true, y_pred):
+    """
+    Calculate Root Mean Squared Logarithmic Error (RMSLE).
+    
+    Parameters:
+    y_true (array): True values
+    y_pred (array): Predicted values
+    
+    Returns:
+    rmsle (float): RMSLE score
+    """
+    # Apply log(1 + x) transformation to both true and predicted values
+    log_true = np.log1p(y_true)
+    log_pred = np.log1p(y_pred)
+    
+    # Calculate MSE of log-transformed values
+    mse = mean_squared_error(log_true, log_pred)
+    
+    # Return square root of MSE
+    return np.sqrt(mse)
+
+def validate_model(X, y, encoder, test_size=0.2, random_state=42):
+    """
+    Validate the model using an 80-20 train-validation split.
+    
+    Parameters:
+    X (DataFrame): Preprocessed features
+    y (Series): Log-transformed target variable
+    encoder (OneHotEncoder): Fitted encoder for Gender column
+    test_size (float): Proportion of data to use for validation
+    random_state (int): Random seed for reproducibility
+    
+    Returns:
+    rmsle (float): RMSLE score on validation set
+    model (XGBRegressor): Trained model
+    """
+    # Split data into train and validation sets
+    X_train, X_val, y_train, y_val = train_test_split(
+        X, y, test_size=test_size, random_state=random_state
+    )
+    
+    # Train model on training set
+    model = train_xgboost_model(X_train, y_train)
+    
+    # Generate predictions on validation set
+    val_predictions = model.predict(X_val)
+    
+    # Convert predictions back to original scale
+    val_predictions_original = np.expm1(val_predictions)
+    y_val_original = np.expm1(y_val)
+    
+    # Calculate RMSLE
+    rmsle = calculate_rmsle(y_val_original, val_predictions_original)
+    
+    return rmsle, model
 
 def save_submission(ids, predictions, filepath):
     """
@@ -136,23 +204,30 @@ def main():
     print("Loading and preprocessing training data...")
     X_train, y_train, encoder = load_and_preprocess_train_data('data/train_subsample.csv')
     
-    # Step 2: Train XGBoost model
-    print("Training XGBoost model...")
-    model = train_xgboost_model(X_train, y_train)
+    # Step 2: Validate model with 80-20 train-validation split
+    print("Validating model...")
+    validation_rmsle, model = validate_model(X_train, y_train, encoder)
+    print(f"Validation RMSLE: {validation_rmsle:.4f}")
     
-    # Step 3: Load and preprocess test data
-    print("Loading and preprocessing test data...")
-    X_test, ids = load_and_preprocess_test_data('data/full_test_for_submission.csv', encoder)
-    
-    # Step 4: Generate predictions
-    print("Generating predictions...")
-    predictions = generate_predictions(model, X_test)
-    
-    # Step 5: Save submission file
-    print("Saving submission file...")
-    save_submission(ids, predictions, 'results/submission.csv')
-    
-    print("Pipeline completed successfully!")
+    # Step 3: Check if validation RMSLE is less than 0.1
+    if validation_rmsle < 0.1:
+        print("Validation passed. Generating submission...")
+        
+        # Step 4: Load and preprocess test data
+        print("Loading and preprocessing test data...")
+        X_test, ids = load_and_preprocess_test_data('data/full_test_for_submission.csv', encoder)
+        
+        # Step 5: Generate predictions
+        print("Generating predictions...")
+        predictions = generate_predictions(model, X_test)
+        
+        # Step 6: Save submission file
+        print("Saving submission file...")
+        save_submission(ids, predictions, 'results/submission.csv')
+        
+        print("Pipeline completed successfully!")
+    else:
+        print(f"Validation failed. RMSLE {validation_rmsle:.4f} is not less than 0.1. No submission generated.")
 
 if __name__ == "__main__":
     main()

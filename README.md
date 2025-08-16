@@ -1,80 +1,59 @@
-# Kaggle Competition: Predict Calorie Expenditure (Playground Series - Season 5, Episode 5)
+# Calorie Expenditure Prediction - Baseline Model
 
-## Project Overview
+This repository contains a baseline machine learning model for predicting calorie expenditure during workouts, based on physiological and workout parameters.
 
-This repository contains a baseline machine learning model for the Kaggle competition "Predict Calorie Expenditure". The goal is to predict the number of calories burned during a workout based on various physiological and workout parameters.
+## Data Files
 
-## Competition Details
+The implementation uses the following data files provided by the user:
 
-- **Task**: Regression problem to predict continuous target value (Calories burned)
-- **Evaluation Metric**: Root Mean Squared Logarithmic Error (RMSLE)
-- **Dataset**: Synthetic data generated from a deep learning model trained on the "Calories Burnt Prediction" dataset
+- `data/train_subsample.csv` - Training data (75,000 samples)
+- `data/test_full.csv` - Full test data for submission (250,000 samples)
+- `data/test_subsample.csv` - Subsampled test data for validation (25,000 samples)
 
-## Data Description
+## Model Architecture
 
-The dataset contains the following features:
-- `id`: Unique identifier for each entry
-- `Gender`: Gender of the participant
-- `Age`: Age of the participant in years
-- `Height`: Height of the participant in cm
-- `Weight`: Weight of the participant in kg
-- `Duration`: Workout duration in minutes
-- `Heart_Rate`: Average heart rate in beats per minute during the workout
-- `Body_Temp`: Body temperature in Celsius during the workout
-- `Calories`: Total calories burned (the target variable)
+The baseline model uses XGBoost Regressor with the following key features:
 
-## Project Structure
+1. **Target Transformation**: Log(1+y) transformation applied to optimize for RMSLE
+2. **Feature Engineering**: One-hot encoding of the Gender/Sex categorical variable
+3. **Validation**: Train/validation split to evaluate model performance before submission
+4. **Prediction Post-processing**: Conversion back to original scale and clipping to ensure physically plausible results
 
-```
-project/
-├── data/
-│   ├── train_subsample.csv
-│   ├── test_subsample.csv
-│   └── full_test_for_submission.csv
-├── models/
-├── notebooks/
-├── src/
-├── results/
-├── baseline_model_plan.md
-├── model_architecture.md
-├── requirements.md
-└── README.md
+## Requirements
+
+- Python 3.7+
+- pandas>=1.3.0
+- numpy>=1.20.0
+- scikit-learn>=1.0.0
+- xgboost>=1.5.0
+
+Install dependencies with:
+```bash
+pip install -r requirements.txt
 ```
 
-## Baseline Model Approach
+## Usage
 
-1. **Data Preprocessing**:
-   - One-hot encoding for categorical variables
-   - Handle missing values if any
+Run the baseline model:
+```bash
+python src/baseline_model.py
+```
 
-2. **Model Selection**:
-   - Linear Regression (simple baseline)
-   - Random Forest Regressor (slightly more complex)
+The script will:
+1. Load and preprocess the training data
+2. Train an XGBoost model on log-transformed targets
+3. Validate model performance on a held-out validation set
+4. If performance is acceptable, generate predictions on the full test set
+5. Save predictions to `results/submission.csv`
 
-3. **Evaluation**:
-   - Cross-validation with RMSLE metric
-   - Model comparison and selection
+## Output
 
-4. **Submission**:
-   - Generate predictions on test set
-   - Format and save submission file
+The submission file will be saved to `results/submission.csv` with the following format:
+```
+id,Calories
+1,300.5
+2,250.2
+...
+```
 
-## Getting Started
-
-1. Ensure all data files are in the `data/` directory
-2. Install required dependencies (see `requirements.md`)
-3. Run the preprocessing, training, and submission scripts
-
-## Results
-
-The baseline model provides a starting point for this competition. Further improvements can be made through:
-- Feature engineering
-- Hyperparameter tuning
-- Advanced modeling techniques
-- Ensemble methods
-
-## Files Description
-
-- `baseline_model_plan.md`: Detailed plan for the baseline model implementation
-- `model_architecture.md`: Architecture diagrams and workflow explanation
-- `requirements.md`: Project dependencies and installation instructions
+This file is ready for submission to the Kaggle competition.
